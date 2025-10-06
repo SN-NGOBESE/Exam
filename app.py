@@ -1,5 +1,9 @@
 # app.py — SA Crime Analytics (Classification + Forecasting, no ARIMA/NN)
-import os, re
+import streamlit as st
+
+st.title("Hello, Streamlit 👋")
+st.write("If you see this message, your app is working!")
+st.line_chart({"data": [1, 5, 2, 6, 9, 3]})import os, re
 from pathlib import Path
 import numpy as np
 import pandas as pd
