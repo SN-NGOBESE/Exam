@@ -1,5 +1,7 @@
 # app.py — SA Crime Analytics (Classification + Forecasting, no ARIMA/NN)
-
+import streamlit as st
+st.title("Hello, Streamlit 👋")
+st.write("If you see this, the environment is OK.")
 import os, re
 from pathlib import Path
 import numpy as np
