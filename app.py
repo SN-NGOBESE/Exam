@@ -392,3 +392,10 @@ with tab3:
         # Small metrics table
         rmse = np.sqrt(np.mean(resid.dropna()**2)) if resid.notna().any() else np.nan
         st.write(pd.DataFrame({"metric":["RMSE (in-sample)"], "value":[rmse]}))
+
+import streamlit as st, os
+if not os.path.exists("crime-statistics-20152016.xlsx"):
+    st.error("Missing file: crime-statistics-20152016.xlsx"); st.stop()
+if not os.path.exists("cfafrica-_-data-team-_-covid-19-_-data-_-openafrica-uploads-_-south-africa-population-density (1).csv"):
+    st.warning("Context CSV not found — app will run crime-only.")
+
