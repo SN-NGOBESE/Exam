@@ -1,4 +1,21 @@
-# app.py
+import streamlit as st
+import pandas as pd
+import re
+
+st.title("Crime Analytics Dashboard – South Africa")
+
+# 🔹 Sidebar upload
+crime_file = st.sidebar.file_uploader("Upload crime workbook (.xlsx)", type=["xlsx"])
+pop_file   = st.sidebar.file_uploader("Upload population density (.csv)", type=["csv"])
+
+if crime_file is not None:
+    xls = pd.ExcelFile(crime_file)
+    stations = pd.read_excel(xls, sheet_name="Stations")
+    year_cols = [c for c in stations.columns if re.fullmatch(r"\d{4}-\d{4}", str(c))]
+    st.success("Crime dataset loaded!")
+    st.dataframe(stations.head())
+else:
+    st.warning("Please upload your crime Excel file.")# app.py
 # South Africa Crime Analytics — Streamlit Dashboard
 # - Hotspot classification (Logit + RandomForest)
 # - Forecasting with Exponential Smoothing (Holt) (no ARIMA/NN)
