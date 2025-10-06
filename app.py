@@ -1,9 +1,6 @@
 # app.py — SA Crime Analytics (Classification + Forecasting, no ARIMA/NN)
-import streamlit as st
 
-st.title("Hello, Streamlit 👋")
-st.write("If you see this message, your app is working!")
-st.line_chart({"data": [1, 5, 2, 6, 9, 3]})import os, re
+import os, re
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -18,14 +15,14 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, roc_auc_score, roc_curve, confusion_matrix
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-# ---------------- Page setup ----------------
+# ---------------- Page setup (must be FIRST Streamlit call) ----------------
 st.set_page_config(page_title="SA Crime Analytics", layout="wide")
 st.title("South Africa Crime Analytics")
 st.caption("Hotspot classification + Holt (Exponential Smoothing) forecast (no ARIMA/NN).")
 
 # ---------------- Constants ----------------
-FEATURE_YEAR = "2014-2015"   # features come from this prior year
-TARGET_YEAR  = "2015-2016"   # label hotspots on this year
+FEATURE_YEAR = "2014-2015"
+TARGET_YEAR  = "2015-2016"
 DEFAULT_CATEGORY = "Burglary at residential premises"
 DEFAULT_PROVINCE = "Gauteng"
 RANDOM_SEED = 42
@@ -59,13 +56,12 @@ def _end_year(label: str):
 def load_crime(file_or_path, sheet_name):
     xls = pd.ExcelFile(file_or_path)
     if sheet_name == "<detect>":
-        # try common sheet names
         candidates = ["Stations", "Station Statistics", "Sheet1"]
         for s in candidates:
             if s in xls.sheet_names:
                 sheet_name = s
                 break
-        if sheet_name == "<detect>":  # fallback to first sheet
+        if sheet_name == "<detect>":
             sheet_name = xls.sheet_names[0]
 
     stations = pd.read_excel(xls, sheet_name=sheet_name, engine="openpyxl")
@@ -85,6 +81,8 @@ def load_crime(file_or_path, sheet_name):
 
 @st.cache_data(show_spinner=True)
 def load_pop(file_or_path):
+    if file_or_path is None:
+        return None
     try:
         pop = pd.read_csv(file_or_path)
     except Exception:
@@ -97,13 +95,11 @@ def load_pop(file_or_path):
     return pop
 
 def build_hotspot_dataset(stations: pd.DataFrame, year_cols, hotspot_top_q):
-    # totals by station & label hotspots on TARGET_YEAR
     df = stations.groupby(["Station","Province","Crime Category"], as_index=False)[year_cols].sum()
     totals = df.groupby(["Station","Province"])[year_cols].sum().reset_index()
     cut = totals[TARGET_YEAR].quantile(hotspot_top_q)
     totals["is_hotspot"] = (totals[TARGET_YEAR] >= cut).astype(int)
 
-    # features from FEATURE_YEAR (counts + proportions)
     wide = df.pivot_table(index=["Station","Province"], columns="Crime Category",
                           values=FEATURE_YEAR, aggfunc="sum", fill_value=0)
     tot_prev = wide.sum(axis=1).replace(0,1)
@@ -166,11 +162,10 @@ def fit_holt(ts, n_ahead=2):
 st.sidebar.header("Data")
 crime_file = st.sidebar.file_uploader("Crime workbook (.xlsx)", type=["xlsx"])
 sheet_name = st.sidebar.selectbox("Crime sheet", options=["<detect>"], index=0)
-
 pop_file   = st.sidebar.file_uploader("Population density (.csv) [optional]", type=["csv"])
 hotspot_top_q = st.sidebar.slider("Hotspot top quantile", 0.50, 0.95, 0.75, 0.05)
 
-# Load data (uploads required for crime)
+# Load data
 if not crime_file:
     st.warning("Please upload the **crime Excel file** (.xlsx).")
     st.stop()
@@ -219,7 +214,7 @@ with tab2:
     st.write(f"Hotspot threshold ({TARGET_YEAR}): **{cut:.0f}** incidents")
     st.write("Hotspot share:", float(data["is_hotspot"].mean()))
 
-    # Optional: merge province-level contextual feature
+    # Optional contextual feature
     data_ctx, ctx_col = merge_province_context(data.assign(Province=data["Province"]), pop) if pop is not None else (None, None)
     if data_ctx is not None and ctx_col in data_ctx.columns:
         st.info("Merged province-level **population_density** as contextual feature.")
@@ -229,11 +224,9 @@ with tab2:
     if st.button("Run models"):
         logit, rf, X_train, X_test, y_train, y_test = train_models_cached(X, y)
 
-        # Predictions
         y_prob_log = logit.predict_proba(X_test)[:,1]; y_pred_log = (y_prob_log >= 0.5).astype(int)
         y_prob_rf  = rf.predict_proba(X_test)[:,1];    y_pred_rf  = (y_prob_rf  >= 0.5).astype(int)
 
-        # Metrics table
         def _row(name, probs, preds):
             rep = classification_report(y_test, preds, output_dict=True, zero_division=0)
             auc = roc_auc_score(y_test, probs)
@@ -244,7 +237,6 @@ with tab2:
         st.write(pd.DataFrame([_row("LogisticRegression", y_prob_log, y_pred_log),
                                _row("RandomForest",      y_prob_rf,  y_pred_rf)]))
 
-        # ROC curves
         c1, c2 = st.columns(2)
         with c1:
             fpr_log, tpr_log, _ = roc_curve(y_test, y_prob_log)
@@ -266,7 +258,6 @@ with tab2:
             plt.xlabel("Importance"); plt.tight_layout()
             st.pyplot(fig)
 
-        # Confusion matrices
         c3, c4 = st.columns(2)
         with c3:
             cm = confusion_matrix(y_test, y_pred_log)
